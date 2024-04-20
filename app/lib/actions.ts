@@ -15,7 +15,11 @@ const FormSchema = z.object({
 
 const CreateInvoice = FormSchema.omit({ id: true, date: true });
 
-export async function createInvoice(formData: FormData): Promise<void> {
+type ReturnMessage = {
+	message: string;
+}
+
+export async function createInvoice(formData: FormData): Promise<void | ReturnMessage> {
 
 	const { customerId, amount, status } = CreateInvoice.parse({
 		customerId: formData.get('customerId'),
@@ -23,15 +27,20 @@ export async function createInvoice(formData: FormData): Promise<void> {
 		status: formData.get('status'),
 	});
 
-	//TODO - handle errors
-
 	const amountInCents = amount * 100;
 	const date = new Date().toISOString().split('T')[0];
 
-	await sql`
-		INSERT INTO invoices (customer_id, amount, status, date)
-		VALUES (${customerId}, ${amountInCents}, ${status}, ${date})
-	`;
+	try {
+		await sql`
+			INSERT INTO invoices (customer_id, amount, status, date)
+			VALUES (${customerId}, ${amountInCents}, ${status}, ${date})
+		`;
+	} catch (error) {
+		//TODO update error handling
+		console.log('ERROR createInvoice', error);
+		return { message: `ERROR createInvoice: ${error}`};
+	}
+	
 
 	revalidatePath('/dashboard/invoices');
 	redirect('/dashboard/invoices');
@@ -41,31 +50,44 @@ export async function createInvoice(formData: FormData): Promise<void> {
 
 const UpdateInvoice = FormSchema.omit({ id: true, date: true });
 
-export async function updateInvoice(id: string, formData: FormData): Promise<void> {
+export async function updateInvoice(id: string, formData: FormData): Promise<void | ReturnMessage> {
 
 	const { customerId, amount, status } = UpdateInvoice.parse({
 		customerId: formData.get('customerId'),
 		amount: formData.get('amount'),
 		status: formData.get('status'),
 	});
-
-	//TODO - handle errors
 	
 	const amountInCents = amount * 100;
 
-	sql`
-		UPDATE invoices 
-		SET customer_id = ${customerId}, amount = ${amountInCents}, status = ${status}
-		WHERE id = ${id}
-	`;
+	try {
+		await sql`
+			UPDATE invoices 
+			SET customer_id = ${customerId}, amount = ${amountInCents}, status = ${status}
+			WHERE id = ${id}
+		`;
+		
+	} catch (error) {
+		//TODO update error handling
+		console.log('ERROR updateInvoice', error);
+		return { message: `ERROR updateInvoice: ${error}`};
+	}
 
 	revalidatePath('/dashboard/invoices');
 	redirect('/dashboard/invoices');
 }
 
 
-export async function deleteInvoice(id: string): Promise<void> {
-	sql`DELETE from invoices where id = ${id}`;
+export async function deleteInvoice(id: string): Promise<void | ReturnMessage> {
+	throw new Error('Failed to Delete Invoice');
+	try {
+		await sql`DELETE from invoices where id = ${id}`;
+		revalidatePath('/dashboard/invoices');
+		return { message: 'Deleted invoice.' };
+	} catch (error) {
+		//TODO update error handling
+		console.log('ERROR deleteInvoice', error);
+		return { message: `ERROR deleteInvoice: ${error}` };
+	}
 
-	revalidatePath('/dashboard/invoices');
 }
